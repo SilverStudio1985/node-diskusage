@@ -81,6 +81,25 @@
     .switch button:hover { background: transparent; }
     .switch button.active { background: #4a90e2; color: #fff; }
 
+    /* binding 状态徽章（顶部） */
+    .binding {
+      display: inline-flex; align-items: center; gap: 6px;
+      margin-left: 10px;
+      padding: 3px 10px; border-radius: 12px;
+      font-size: 11px; font-weight: 600;
+      vertical-align: middle;
+    }
+    .binding.prebuild     { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+    .binding.local-build  { background: #fff3cd; color: #856404; border: 1px solid #ffeeba; }
+    .binding.other        { background: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+    .binding.unknown      { background: #e2e3e5; color: #383d41; border: 1px solid #d6d8db; }
+    .binding-path {
+      color: #888; font-size: 11px;
+      font-family: ui-monospace, "SF Mono", Consolas, monospace;
+      margin-top: 4px;
+      word-break: break-all;
+    }
+
     /* 单路径查询 */
     .row { margin-bottom: 12px; }
     input { width: 60%; padding: 6px 10px; border: 1px solid #ccc; border-radius: 4px; }
@@ -99,6 +118,7 @@
 <body>
   <h1>@iislove/diskusage · Electron 真机抽样验证</h1>
   <div class="meta" id="meta">加载中…</div>
+  <div class="binding-path" id="binding-path"></div>
 
   <div class="tabs">
     <div class="tab active" data-tab="list">磁盘列表</div>
@@ -258,16 +278,25 @@
       renderList();
     });
 
+    function applyMeta(data) {
+      const b = data.binding || {};
+      const cls = b.kind || 'unknown';
+      const label = escapeHtml(b.label || '未知 binding') +
+        (b.detail ? ` [${escapeHtml(b.detail)}]` : '');
+      $('meta').innerHTML =
+        `Electron ${data.runtime.electron} | Chrome ${data.runtime.chrome} | ` +
+        `Node ${data.runtime.node} | NAPI ${data.runtime.napi} | ` +
+        `${data.runtime.platform}-${data.runtime.arch}` +
+        `<span class="binding ${cls}">${label}</span>`;
+      $('binding-path').textContent = b.path ? `binding: ${b.path}` : '';
+    }
+
     // ---- 单路径查询 ----
     async function probe() {
       $('out').textContent = '查询中…';
       try {
         const data = await window.diskApi.check($('path').value.trim());
-        // 顶部 meta（运行时信息）
-        $('meta').textContent =
-          `Electron ${data.runtime.electron} | Chrome ${data.runtime.chrome} | ` +
-          `Node ${data.runtime.node} | NAPI ${data.runtime.napi} | ` +
-          `${data.runtime.platform}-${data.runtime.arch}`;
+        applyMeta(data);
         $('out').textContent = JSON.stringify(data, null, 2);
       } catch (e) {
         $('out').textContent = '错误：' + (e && e.message ? e.message : String(e));
@@ -279,10 +308,7 @@
     (async () => {
       try {
         const data = await window.diskApi.check('');
-        $('meta').textContent =
-          `Electron ${data.runtime.electron} | Chrome ${data.runtime.chrome} | ` +
-          `Node ${data.runtime.node} | NAPI ${data.runtime.napi} | ` +
-          `${data.runtime.platform}-${data.runtime.arch}`;
+        applyMeta(data);
       } catch (e) {
         $('meta').textContent = '错误：' + (e && e.message ? e.message : String(e));
       }

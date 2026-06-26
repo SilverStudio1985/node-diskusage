@@ -7,6 +7,34 @@ const os = require('node:os');
 // 在主进程加载 native 模块；同时通过 IPC 暴露给 renderer。
 const diskusage = require('@iislove/diskusage');
 
+// 实际加载的 .node 路径（首个 .node 即我们的 binding）
+const loadedNativePath = (() => {
+  for (const k of Object.keys(require.cache)) {
+    if (k.endsWith('.node')) return k;
+  }
+  return null;
+})();
+
+// 推断 binding 是来自 prebuilds/ 还是本地 build/
+function detectBindingSource(p) {
+  if (!p) return { kind: 'unknown', label: '未知', detail: '' };
+  const lower = p.replace(/\\/g, '/').toLowerCase();
+  if (lower.includes('/prebuilds/')) {
+    const m = lower.match(/\/prebuilds\/([^/]+)\//);
+    return {
+      kind: 'prebuild',
+      label: '预编译（prebuild）',
+      detail: m ? m[1] : '',
+    };
+  }
+  if (lower.includes('/build/release/') || lower.includes('/build/debug/')) {
+    return { kind: 'local-build', label: '本地编译（node-gyp）', detail: '' };
+  }
+  return { kind: 'other', label: '其他来源', detail: '' };
+}
+
+const bindingSource = detectBindingSource(loadedNativePath);
+
 function defaultPath() {
   switch (os.platform()) {
     case 'win32':  return 'C:\\';
@@ -33,6 +61,12 @@ ipcMain.handle('disk:check', async (_event, p) => {
     target,
     number: n,
     bigint: serializeUsage(b),
+    binding: {
+      path:   loadedNativePath,
+      kind:   bindingSource.kind,
+      label:  bindingSource.label,
+      detail: bindingSource.detail,
+    },
     runtime: {
       node:     process.versions.node,
       napi:     process.versions.napi,
@@ -90,11 +124,10 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
-  // 主进程先打印一次，方便在终端直接看出加载到的 .node 路径
-  try {
-    const native = Object.keys(require.cache).filter(k => k.endsWith('.node'));
-    console.log('[main] native modules loaded:', native);
-  } catch (_) { /* ignore */ }
+  // 启动日志：明确告知加载到的是 prebuild 还是本地 build
+  console.log(`[main] native binding: ${bindingSource.label}` +
+    (bindingSource.detail ? ` [${bindingSource.detail}]` : ''));
+  console.log('[main] native path:', loadedNativePath);
 
   createWindow();
   app.on('activate', () => {
