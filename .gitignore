@@ -1,0 +1,10 @@
+node_modules/
+build/
+prebuilds/
+*.log
+.DS_Store
+.vs/
+.vscode/
+*.tsbuildinfo
+demo/electron/package-lock.json
+demo/electron/node_modules/

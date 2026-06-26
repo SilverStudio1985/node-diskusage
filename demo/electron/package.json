@@ -1,0 +1,17 @@
+{
+  "name": "diskusage-electron-demo",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Minimal Electron sample to verify @iislove/diskusage prebuilds in renderer & main process",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "rebuild": "electron-rebuild -f -w @iislove/diskusage"
+  },
+  "dependencies": {
+    "@iislove/diskusage": "file:../.."
+  },
+  "devDependencies": {
+    "electron": "^31.0.0"
+  }
+}

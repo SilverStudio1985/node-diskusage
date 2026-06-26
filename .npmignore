@@ -1,0 +1,11 @@
+# Exclude source/build artifacts from npm package; we ship prebuilds + a thin source for fallback build.
+.github/
+test/
+demo/
+build/
+*.log
+.editorconfig
+.eslintrc*
+.gitignore
+.vscode/
+.vs/

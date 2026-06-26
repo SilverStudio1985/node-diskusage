@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title>@iislove/diskusage · Electron demo</title>
+  <style>
+    :root { color-scheme: light dark; }
+    * { box-sizing: border-box; }
+    body {
+      font-family: -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", Roboto, sans-serif;
+      margin: 0; padding: 20px;
+      background: #f5f6f8;
+    }
+    h1 { font-size: 18px; margin: 0 0 6px; }
+    .meta { color: #777; font-size: 12px; margin-bottom: 16px; }
+
+    .tabs { display: flex; gap: 4px; border-bottom: 1px solid #ddd; margin-bottom: 16px; }
+    .tab {
+      padding: 8px 16px; cursor: pointer;
+      border: 1px solid transparent; border-bottom: none;
+      border-radius: 6px 6px 0 0;
+      font-size: 13px; color: #555; user-select: none;
+    }
+    .tab.active { background: #fff; border-color: #ddd; color: #222; font-weight: 600; }
+    .panel { display: none; }
+    .panel.active { display: block; }
+
+    /* 磁盘列表 */
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 12px;
+    }
+    .card {
+      background: #fff;
+      border-radius: 10px;
+      padding: 14px 16px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+      border: 1px solid #eee;
+    }
+    .card-head {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 10px;
+    }
+    .mount {
+      font-weight: 600; font-size: 15px;
+      font-family: ui-monospace, "SF Mono", Consolas, monospace;
+    }
+    .badge {
+      font-size: 11px; padding: 2px 8px; border-radius: 10px; color: #fff;
+    }
+    .badge.fixed     { background: #4a90e2; }
+    .badge.removable { background: #f5a623; }
+    .badge.network   { background: #7b1fa2; }
+    .badge.cdrom     { background: #888; }
+    .badge.ramdisk   { background: #2ecc71; }
+    .badge.unknown   { background: #aaa; }
+    .label {
+      color: #666; font-size: 12px; margin-bottom: 8px;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .bar-wrap { background: #eee; border-radius: 4px; height: 8px; overflow: hidden; margin: 8px 0 6px; }
+    .bar { height: 100%; background: linear-gradient(90deg, #5fb878, #4a90e2); transition: width .3s; }
+    .bar.danger { background: linear-gradient(90deg, #ff6b6b, #ff3b30); }
+    .bar.warn   { background: linear-gradient(90deg, #f5a623, #ff9500); }
+    .nums { display: flex; justify-content: space-between; font-size: 12px; color: #555; }
+    .raw  { margin-top: 6px; font-size: 11px; color: #999; font-family: ui-monospace, "SF Mono", Consolas, monospace; word-break: break-all; }
+    .err { color: #c00; font-size: 12px; }
+
+    /* 切换器 */
+    .switch {
+      display: inline-flex; align-items: center; gap: 6px;
+      margin-left: 8px; font-size: 12px; color: #555;
+      background: #fff; border: 1px solid #ddd; border-radius: 14px;
+      padding: 3px;
+    }
+    .switch button {
+      margin: 0; padding: 3px 10px; font-size: 12px;
+      background: transparent; color: #555; border-radius: 12px;
+    }
+    .switch button:hover { background: transparent; }
+    .switch button.active { background: #4a90e2; color: #fff; }
+
+    /* 单路径查询 */
+    .row { margin-bottom: 12px; }
+    input { width: 60%; padding: 6px 10px; border: 1px solid #ccc; border-radius: 4px; }
+    button {
+      padding: 6px 14px; margin-left: 8px;
+      background: #4a90e2; color: #fff; border: none; border-radius: 4px; cursor: pointer;
+    }
+    button:hover { background: #357abd; }
+    pre {
+      background: #1e1e1e; color: #d4d4d4;
+      padding: 12px; border-radius: 6px; overflow: auto;
+      font-size: 12px; line-height: 1.5;
+    }
+  </style>
+</head>
+<body>
+  <h1>@iislove/diskusage · Electron 真机抽样验证</h1>
+  <div class="meta" id="meta">加载中…</div>
+
+  <div class="tabs">
+    <div class="tab active" data-tab="list">磁盘列表</div>
+    <div class="tab"        data-tab="probe">单路径查询</div>
+  </div>
+
+  <!-- Tab 1: 磁盘列表 -->
+  <div class="panel active" id="panel-list">
+    <div class="row">
+      <button id="refresh">刷新</button>
+      <span class="switch" id="view-switch">
+        <button data-view="volumes" class="active">所有卷</button>
+        <button data-view="physical">物理盘</button>
+      </span>
+      <span class="switch" id="kind-switch">
+        <button data-kind="number" class="active">Number</button>
+        <button data-kind="bigint">BigInt</button>
+      </span>
+      <span style="color:#666; font-size:12px; margin-left:8px;" id="list-meta"></span>
+    </div>
+    <div class="grid" id="grid">加载中…</div>
+  </div>
+
+  <!-- Tab 2: 单路径查询 -->
+  <div class="panel" id="panel-probe">
+    <div class="row">
+      <input id="path" placeholder="留空则使用平台默认路径（Win: C:\\，*nix: /）" />
+      <button id="go">查询</button>
+    </div>
+    <pre id="out">点击"查询"开始…</pre>
+  </div>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+
+    function fmtBytes(n) {
+      const v = typeof n === 'string' ? Number(n) : n;
+      if (!Number.isFinite(v)) return String(n);
+      const units = ['B', 'KB', 'MB', 'GB', 'TB', 'PB'];
+      let i = 0, x = v;
+      while (x >= 1024 && i < units.length - 1) { x /= 1024; i++; }
+      return `${x.toFixed(2)} ${units[i]}`;
+    }
+
+    function escapeHtml(s) {
+      return String(s).replace(/[&<>"']/g, (c) => ({
+        '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+      }[c]));
+    }
+
+    // ---- Tabs ----
+    document.querySelectorAll('.tab').forEach(el => {
+      el.addEventListener('click', () => {
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+        el.classList.add('active');
+        $('panel-' + el.dataset.tab).classList.add('active');
+      });
+    });
+
+    // ---- 磁盘列表 ----
+    let currentKind = 'number';  // 'number' | 'bigint'
+    let currentView = 'volumes'; // 'volumes' | 'physical'
+
+    async function renderList() {
+      $('grid').textContent = '加载中…';
+      try {
+        const big = currentKind === 'bigint';
+        const physical = currentView === 'physical';
+        const list = await window.diskApi.listVolumes({ big, physical });
+        $('list-meta').textContent =
+          `共 ${list.length} 个${physical ? '物理盘' : '卷'} · ` +
+          `值类型 = ${big ? 'BigInt (传输时转 string)' : 'Number'}`;
+        if (list.length === 0) {
+          $('grid').innerHTML = '<div style="color:#888;">未发现任何卷</div>';
+          return;
+        }
+
+        const html = list.map(v => {
+          if (!v.ok) {
+            return `
+              <div class="card">
+                <div class="card-head">
+                  <span class="mount">${escapeHtml(v.mountpoint)}</span>
+                  <span class="badge ${escapeHtml(v.type)}">${escapeHtml(v.type)}</span>
+                </div>
+                <div class="err">${escapeHtml(v.error || '不可用')}</div>
+              </div>`;
+          }
+          // BigInt 模式下 usage 字段是字符串；用 Number 仅用于计算百分比与展示
+          const totalNum = Number(v.usage.total);
+          const freeNum  = Number(v.usage.free);
+          const availNum = Number(v.usage.available);
+          const used     = totalNum - freeNum;
+          const pct      = totalNum > 0 ? (used / totalNum) * 100 : 0;
+          const cls      = pct >= 90 ? 'danger' : pct >= 75 ? 'warn' : '';
+          const labelLine = [v.name, v.fs].filter(Boolean).join(' · ');
+
+          // BigInt 模式下额外显示一行原始字符串值，方便对比
+          const rawLine = big ? `
+            <div class="raw" title="原始 BigInt 字符串">
+              total=${escapeHtml(v.usage.total)}n · free=${escapeHtml(v.usage.free)}n · avail=${escapeHtml(v.usage.available)}n
+            </div>` : '';
+
+          // device + mountpoints（物理盘视图下尤其有用）
+          const deviceLine = v.device
+            ? `<div class="raw" title="device 标识">device: ${escapeHtml(v.device)}</div>`
+            : '';
+          const mountsLine = (physical && v.mountpoints && v.mountpoints.length > 1)
+            ? `<div class="raw" title="同一物理盘的所有挂载点">
+                 挂载点 (${v.mountpoints.length}): ${escapeHtml(v.mountpoints.join('  '))}
+               </div>`
+            : '';
+
+          return `
+            <div class="card">
+              <div class="card-head">
+                <span class="mount">${escapeHtml(v.mountpoint)}</span>
+                <span class="badge ${escapeHtml(v.type)}">${escapeHtml(v.type)}</span>
+              </div>
+              <div class="label" title="${escapeHtml(labelLine)}">${escapeHtml(labelLine || '—')}</div>
+              <div class="bar-wrap"><div class="bar ${cls}" style="width:${pct.toFixed(1)}%"></div></div>
+              <div class="nums">
+                <span>已用 ${fmtBytes(used)} (${pct.toFixed(1)}%)</span>
+                <span>可用 ${fmtBytes(availNum)}</span>
+              </div>
+              <div class="nums" style="margin-top:4px; color:#888;">
+                <span>总容量</span>
+                <span>${fmtBytes(totalNum)}</span>
+              </div>
+              ${deviceLine}
+              ${mountsLine}
+              ${rawLine}
+            </div>`;
+        }).join('');
+        $('grid').innerHTML = html;
+      } catch (e) {
+        $('grid').innerHTML = `<div class="err">错误：${escapeHtml(e.message || e)}</div>`;
+      }
+    }
+
+    $('refresh').addEventListener('click', renderList);
+    // Number/BigInt 切换
+    $('kind-switch').addEventListener('click', (e) => {
+      const btn = e.target.closest('button[data-kind]');
+      if (!btn) return;
+      currentKind = btn.dataset.kind;
+      $('kind-switch').querySelectorAll('button').forEach(b => b.classList.toggle('active', b === btn));
+      renderList();
+    });
+    // 所有卷/物理盘 切换
+    $('view-switch').addEventListener('click', (e) => {
+      const btn = e.target.closest('button[data-view]');
+      if (!btn) return;
+      currentView = btn.dataset.view;
+      $('view-switch').querySelectorAll('button').forEach(b => b.classList.toggle('active', b === btn));
+      renderList();
+    });
+
+    // ---- 单路径查询 ----
+    async function probe() {
+      $('out').textContent = '查询中…';
+      try {
+        const data = await window.diskApi.check($('path').value.trim());
+        // 顶部 meta（运行时信息）
+        $('meta').textContent =
+          `Electron ${data.runtime.electron} | Chrome ${data.runtime.chrome} | ` +
+          `Node ${data.runtime.node} | NAPI ${data.runtime.napi} | ` +
+          `${data.runtime.platform}-${data.runtime.arch}`;
+        $('out').textContent = JSON.stringify(data, null, 2);
+      } catch (e) {
+        $('out').textContent = '错误：' + (e && e.message ? e.message : String(e));
+      }
+    }
+    $('go').addEventListener('click', probe);
+
+    // 初始化：先取一次运行时元信息（顺便预热 native 模块），再渲染列表
+    (async () => {
+      try {
+        const data = await window.diskApi.check('');
+        $('meta').textContent =
+          `Electron ${data.runtime.electron} | Chrome ${data.runtime.chrome} | ` +
+          `Node ${data.runtime.node} | NAPI ${data.runtime.napi} | ` +
+          `${data.runtime.platform}-${data.runtime.arch}`;
+      } catch (e) {
+        $('meta').textContent = '错误：' + (e && e.message ? e.message : String(e));
+      }
+      renderList();
+    })();
+  </script>
+</body>
+</html>

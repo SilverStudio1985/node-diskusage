@@ -1,0 +1,57 @@
+{
+  "name": "@iislove/diskusage",
+  "version": "2.0.0",
+  "description": "Cross-platform disk usage check using N-API (Node 14.21.3+ / Electron compatible)",
+  "main": "lib/index.js",
+  "types": "lib/index.d.ts",
+  "files": [
+    "lib/",
+    "src/",
+    "binding.gyp",
+    "prebuilds/",
+    "LICENSE",
+    "README.md"
+  ],
+  "scripts": {
+    "install": "node-gyp-build",
+    "rebuild": "node-gyp rebuild",
+    "prebuildify": "prebuildify --napi --strip --target=14.21.3",
+    "prebuildify-cross": "prebuildify --napi --strip",
+    "test": "node --test test/basic.test.js"
+  },
+  "engines": {
+    "node": ">=14.21.3"
+  },
+  "dependencies": {
+    "node-addon-api": "^6.1.0",
+    "node-gyp-build": "^4.8.1"
+  },
+  "devDependencies": {
+    "node-gyp": "^10.2.0",
+    "prebuildify": "^6.0.1"
+  },
+  "binary": {
+    "napi_versions": [8]
+  },
+  "license": "MIT",
+  "keywords": [
+    "disk",
+    "diskusage",
+    "disk-usage",
+    "free-space",
+    "statvfs",
+    "GetDiskFreeSpaceEx",
+    "napi",
+    "n-api",
+    "electron",
+    "prebuild"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SilverStudio1985/node-diskusage.git"
+  },
+  "homepage": "https://github.com/SilverStudio1985/node-diskusage#readme",
+  "bugs": {
+    "url": "https://github.com/SilverStudio1985/node-diskusage/issues"
+  }
+}
