@@ -35,8 +35,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # 14.x 没有 darwin-arm64 版本，所以这里只跑 win/linux/macos-x64(macos-13)
-        os: [windows-2022, ubuntu-22.04, macos-13]
+        # 只在 Linux/Windows 上验证 Node 14。原因：
+        #   - Node 14 从未为 darwin-arm64 发布过二进制；
+        #   - macOS x64 + Node 14 的覆盖已由 prebuild workflow 提供（构建产物本身就是给该平台用的），
+        #     在 CI 上反复跑 macos-13 runner 排队慢且对用户场景意义不大（macOS 14+ 默认不支持 Node 14）。
+        os: [windows-2022, ubuntu-22.04]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
