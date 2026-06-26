@@ -5,13 +5,22 @@ on:
   push:
     branches: [main, master]
 
+# 关键设计：
+#   - 我们要保证「在 Node 14.21.3+ 上能正确加载 N-API v8 的 .node」
+#   - 但 node-gyp 10.x 已不支持 Node 14（它依赖 stream.pipeline 顶层导出），
+#     而 Node 14 在 macOS arm64 上根本没有官方构建（M 系列出来时 14 已 EOL）。
+#   - 因此 CI 流程：用 Node 20 当构建机跑 prebuildify，再切到目标 Node 版本仅跑测试。
+#     测试期间 node-gyp-build 会自动命中 prebuilds/<platform>-<arch>/...node，
+#     这正是用户安装我们的包时的真实路径。
+
 jobs:
-  build-and-test:
+  # ---------- 主流 Node（>=18）：原生 install + test ----------
+  modern:
     strategy:
       fail-fast: false
       matrix:
         os: [windows-2022, macos-14, ubuntu-22.04]
-        node: ['14.21.3', '18', '20', '22']
+        node: ['18', '20', '22']
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -20,3 +29,40 @@ jobs:
           node-version: ${{ matrix.node }}
       - run: npm install
       - run: npm test
+
+  # ---------- Node 14.21.3：prebuild 加载验证 ----------
+  legacy-node14:
+    strategy:
+      fail-fast: false
+      matrix:
+        # 14.x 没有 darwin-arm64 版本，所以这里只跑 win/linux/macos-x64(macos-13)
+        os: [windows-2022, ubuntu-22.04, macos-13]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # 第一阶段：用 Node 20 当构建机，产出 prebuild
+      - name: Setup host Node 20 (build)
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install deps (no scripts) & build prebuild
+        run: |
+          npm install --ignore-scripts
+          npx prebuildify --napi --strip
+        shell: bash
+
+      # 第二阶段：切到 Node 14.21.3，仅做加载与测试
+      - name: Setup target Node 14.21.3
+        uses: actions/setup-node@v4
+        with:
+          node-version: '14.21.3'
+
+      - name: Run smoke test on Node 14
+        run: |
+          node -e "console.log('node:', process.version, 'napi:', process.versions.napi)"
+          # node-gyp-build 会优先加载 prebuilds/<plat>-<arch>/...，不会走 node-gyp
+          # 14.x 上没有 node:test，所以走 smoke.js
+          node test/smoke.js
+        shell: bash
