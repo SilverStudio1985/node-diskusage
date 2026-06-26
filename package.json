@@ -10,7 +10,8 @@
     "binding.gyp",
     "prebuilds/",
     "LICENSE",
-    "README.md"
+    "README.md",
+    "CHANGELOG.md"
   ],
   "scripts": {
     "install": "node-gyp-build",
@@ -34,18 +35,36 @@
     "napi_versions": [8]
   },
   "license": "MIT",
+  "author": "SilverStudio1985",
   "keywords": [
     "disk",
     "diskusage",
     "disk-usage",
+    "disk-space",
     "free-space",
+    "available-space",
     "statvfs",
     "GetDiskFreeSpaceEx",
+    "volumes",
+    "drives",
+    "mountpoint",
     "napi",
     "n-api",
+    "node-api",
+    "node-addon-api",
     "electron",
-    "prebuild"
+    "prebuild",
+    "prebuilt",
+    "cross-platform",
+    "windows",
+    "macos",
+    "apple-silicon",
+    "m1",
+    "arm64",
+    "linux"
   ],
+  "os": ["darwin", "linux", "win32"],
+  "cpu": ["x64", "arm64"],
   "repository": {
     "type": "git",
     "url": "git+https://github.com/SilverStudio1985/node-diskusage.git"

@@ -1,5 +1,12 @@
 # @iislove/diskusage
 
+[![npm version](https://img.shields.io/npm/v/@iislove/diskusage.svg)](https://www.npmjs.com/package/@iislove/diskusage)
+[![npm downloads](https://img.shields.io/npm/dm/@iislove/diskusage.svg)](https://www.npmjs.com/package/@iislove/diskusage)
+[![ci](https://github.com/SilverStudio1985/node-diskusage/actions/workflows/ci.yml/badge.svg)](https://github.com/SilverStudio1985/node-diskusage/actions/workflows/ci.yml)
+[![prebuild](https://github.com/SilverStudio1985/node-diskusage/actions/workflows/prebuild.yml/badge.svg)](https://github.com/SilverStudio1985/node-diskusage/actions/workflows/prebuild.yml)
+[![node](https://img.shields.io/node/v/@iislove/diskusage.svg)](https://nodejs.org/)
+[![license](https://img.shields.io/github/license/SilverStudio1985/node-diskusage.svg)](./LICENSE)
+
 跨平台磁盘空间查询模块，基于 **N-API**（Node-API v8）重写，Node 14.21.3+ / Electron 16+ 通用。原生 NAN 版本 [`jduncanator/node-diskusage`](https://github.com/jduncanator/node-diskusage) 的现代化继任版本。
 
 ## 特性
