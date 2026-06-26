@@ -13,7 +13,10 @@ jobs:
         include:
           - { os: windows-2022,     arch: x64,   name: win32-x64 }
           - { os: windows-2022,     arch: arm64, name: win32-arm64 }
-          - { os: macos-13,         arch: x64,   name: darwin-x64 }
+          # macOS：统一在 macos-14（Apple Silicon）runner 上构建。
+          # arm64 用原生编译；x64 用 Apple 的 -arch x86_64 交叉编译。
+          # 这样可以避开 GitHub macos-13 runner 排队/缺货的问题，且产物兼容性完全等价。
+          - { os: macos-14,         arch: x64,   name: darwin-x64,   mac_cross: true }
           - { os: macos-14,         arch: arm64, name: darwin-arm64 }
           - { os: ubuntu-22.04,     arch: x64,   name: linux-x64 }
           # 如果该 label 在你账户下不可见，可改成 ubuntu-24.04-arm
@@ -31,17 +34,37 @@ jobs:
       - name: Install deps (no scripts)
         run: npm ci --ignore-scripts || npm install --ignore-scripts
 
-      - name: Prebuildify (host arch)
-        if: matrix.arch == 'x64' || (matrix.os == 'macos-14' && matrix.arch == 'arm64') || (matrix.os == 'ubuntu-22.04-arm' && matrix.arch == 'arm64')
+      # 三类构建方式：原生 / Windows arm64 交叉 / macOS x64 交叉
+      - name: Prebuildify (native host arch)
+        if: >-
+          (matrix.os == 'windows-2022' && matrix.arch == 'x64') ||
+          (matrix.os == 'macos-14'      && matrix.arch == 'arm64') ||
+          (matrix.os == 'ubuntu-22.04'  && matrix.arch == 'x64') ||
+          (matrix.os == 'ubuntu-22.04-arm' && matrix.arch == 'arm64')
         run: npx prebuildify --napi --strip
 
       - name: Prebuildify (windows arm64 cross)
         if: matrix.os == 'windows-2022' && matrix.arch == 'arm64'
         run: npx prebuildify --napi --strip --arch=arm64
 
+      # macOS x64 交叉编译：在 macos-14 (arm64) 上用 -arch x86_64 让 clang/ld 产出 x86_64 mach-o。
+      # MACOSX_DEPLOYMENT_TARGET 与 binding.gyp 中保持一致（10.15），确保旧 Intel Mac 也能加载。
+      - name: Prebuildify (macOS x64 cross)
+        if: matrix.os == 'macos-14' && matrix.arch == 'x64'
+        env:
+          CFLAGS: '-arch x86_64'
+          CXXFLAGS: '-arch x86_64'
+          LDFLAGS: '-arch x86_64'
+          MACOSX_DEPLOYMENT_TARGET: '10.15'
+        run: npx prebuildify --napi --strip --arch=x64
+
       - name: Show produced binaries
         shell: bash
-        run: ls -lR prebuilds || true
+        run: |
+          ls -lR prebuilds || true
+          if command -v file >/dev/null 2>&1; then
+            find prebuilds -name '*.node' -exec file {} \; || true
+          fi
 
       - uses: actions/upload-artifact@v4
         with:
